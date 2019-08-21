@@ -1,0 +1,10 @@
+version: "3"
+services:
+  analytics-reader:
+    build:
+      context: ./consumer
+      dockerfile: Dockerfile-reader
+    volumes:
+      - delta:/storage
+volumes:
+  delta:

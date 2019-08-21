@@ -2,6 +2,10 @@ package com.renarde.wikiflow.consumer
 
 import com.typesafe.scalalogging.LazyLogging
 import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types._
+
+
 
 object AnalyticsConsumer extends App with LazyLogging {
 
@@ -12,10 +16,12 @@ object AnalyticsConsumer extends App with LazyLogging {
     .config("spark.driver.memory", "5g")
     .master("local[2]")
     .getOrCreate()
+
+  import spark.implicits._
+
+  logger.info("Initializing analytics consumer")
+
   spark.sparkContext.setLogLevel("WARN")
-
-  logger.info("Initializing Structured consumer")
-
 
   val inputStream = spark.readStream
     .format("kafka")
@@ -24,10 +30,31 @@ object AnalyticsConsumer extends App with LazyLogging {
     .option("startingOffsets", "earliest")
     .load()
 
-  // please edit the code below
-  val transformedStream: DataFrame = inputStream
 
-  transformedStream.writeStream
+  val preparedDS = inputStream.selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)").as[(String, String)]
+
+  val rawData = preparedDS.filter($"value".isNotNull)
+
+  val expectedSchema = new StructType()
+    .add(StructField("bot", BooleanType))
+    .add("timestamp", LongType)
+    .add("type", StringType)
+
+  val parsedData = rawData.select(from_json($"value", expectedSchema).as("data")).select("data.*")
+
+  // please edit the code below
+  val transformedStream: DataFrame = parsedData
+    .filter("!bot")
+    .withColumn("timestamp", ($"timestamp").cast(TimestampType))
+    .withWatermark("timestamp", "30 seconds")
+    .groupBy(
+      window($"timestamp", "30 seconds"),
+      $"type")
+    .agg(count($"*").as("cnt"))
+    .withColumn("load_dttm", expr("CURRENT_TIMESTAMP()"))
+
+
+  val output = transformedStream.writeStream
     .outputMode("append")
     .format("delta")
     .option("checkpointLocation", "/storage/analytics-consumer/checkpoints")

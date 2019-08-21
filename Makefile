@@ -19,3 +19,8 @@ run-analytics-consumer:
 	mvn clean package -pl consumer
 	docker-compose -f docker-compose-analytics-consumer.yaml build
 	docker-compose -f docker-compose-analytics-consumer.yaml up
+
+run-analytics-reader:
+	mvn clean package -pl consumer
+	docker-compose -f docker-compose-analytics-reader.yaml build
+	docker-compose -f docker-compose-analytics-reader.yaml up

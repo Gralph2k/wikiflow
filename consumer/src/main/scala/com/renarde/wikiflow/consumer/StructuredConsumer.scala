@@ -7,6 +7,7 @@ import org.apache.spark.sql.types._
 
 object StructuredConsumer extends App with LazyLogging {
   val appName: String = "structured-consumer-example"
+  println(appName)
 
   val spark: SparkSession = SparkSession.builder()
     .appName(appName)
